@@ -1,17 +1,21 @@
 import { Router } from 'express'
 import {
   emailVerifyTokenController,
+  forgotPasswordController,
   loginController,
   logoutController,
   registerController,
-  resendEmailVerifyController
+  resendEmailVerifyController,
+  verifyForgotPasswordController
 } from '~/controllers/users.controllers'
 import {
   accessTokenValidator,
   emailVerifyTokenValidator,
+  forgotPasswordValidator,
   loginValidator,
   refreshTokenValidator,
-  registerValidator
+  registerValidator,
+  verifyForgotPasswordValidator
 } from '~/middlewares/users.middlewares'
 import { warpAsync } from '~/utils/handlers'
 // co the thay the bang : import {Router} from 'express'
@@ -53,5 +57,24 @@ userRouter.post('/verify-email', emailVerifyTokenValidator, warpAsync(emailVerif
  * @headers {Authorization: Bearer <access_token>} //đăng nhập mới cho resend email verify
  */
 userRouter.post('/resend-email-verify', accessTokenValidator, warpAsync(resendEmailVerifyController))
+
+/**
+ * @description forgot password
+ * khi người dùng quên mật khẩu, họ gửi email để xin mình tạo cho họ forgot password
+ * @path /users/forgot-password
+ * @method post
+ * @body {email: string}
+ */
+userRouter.post('/forgot-password', forgotPasswordValidator, warpAsync(forgotPasswordController))
+
+/**
+ * @description reset password
+ * khi người dùng nhấp vào link trong email để resetpassword họ sẽ gửi 1 req kềm theo forgot_pasword_token lên server
+ * server sẽ kiểm tra forgot_password_token xem có hợp lệ hay không
+ * @path /users/verify-forgot-password
+ * @method post
+ * @body {forgot_password_token: string}
+ */
+userRouter.post('/verify-forgot-password', verifyForgotPasswordValidator, warpAsync(verifyForgotPasswordController))
 
 export default userRouter

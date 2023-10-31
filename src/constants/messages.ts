@@ -38,5 +38,9 @@ export const USERS_MESSAGES = {
   VERIFY_EMAIL_SUCCESS: 'Verify email success',
   USER_BANNED: 'User banned',
   RESEND_VERIFY_EMAIL_SUCCESS: 'Resend verify email success',
-  EMAIL_VERIFY_TOKEN_IS_INCORRECT: 'Email verify token is incorrect'
+  EMAIL_VERIFY_TOKEN_IS_INCORRECT: 'Email verify token is incorrect',
+  CHECK_EMAIL_TO_RESET_PASSWORD: 'Check email to reset password',
+  FORGOT_PASSWORD_TOKEN_IS_REQUIRED: 'Forgot password token is required',
+  FORGOT_PASSWORD_TOKEN_IS_INCORRECT: 'Forgot password token is incorrect',
+  VERIFY_FORGOT_PASSWORD_SUCCESS: 'Verify forgot password success'
 } as const //để k ai chỉnh đc
