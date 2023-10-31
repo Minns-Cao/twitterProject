@@ -62,6 +62,7 @@ class UsersService {
       })
     )
     //aws gửi mail
+    console.log(email_verify_token)
     return { access_token, refresh_token }
   }
 
@@ -108,6 +109,28 @@ class UsersService {
         user_id: new ObjectId(user_id)
       })
     )
+  }
+
+  async resendEmailVerify(user_id: string) {
+    //tạo ra  email token
+    const email_verify_token = await this.signEmailVerifyToken(user_id)
+    //update lại usser
+
+    await databaseService.users.updateOne({ _id: new ObjectId(user_id) }, [
+      {
+        $set: {
+          email_verify_token,
+          updated_at: '$$NOW'
+        }
+      }
+    ])
+    //giả lập gửi mail
+    console.log(email_verify_token)
+
+    //trả về message
+    return {
+      message: USERS_MESSAGES.RESEND_VERIFY_EMAIL_SUCCESS
+    }
   }
 }
 
