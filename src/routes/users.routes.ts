@@ -2,10 +2,12 @@ import { Router } from 'express'
 import {
   emailVerifyTokenController,
   forgotPasswordController,
+  getMeController,
   loginController,
   logoutController,
   registerController,
   resendEmailVerifyController,
+  resetPasswordController,
   verifyForgotPasswordController
 } from '~/controllers/users.controllers'
 import {
@@ -15,6 +17,7 @@ import {
   loginValidator,
   refreshTokenValidator,
   registerValidator,
+  resetPasswordValidator,
   verifyForgotPasswordValidator
 } from '~/middlewares/users.middlewares'
 import { warpAsync } from '~/utils/handlers'
@@ -76,5 +79,29 @@ userRouter.post('/forgot-password', forgotPasswordValidator, warpAsync(forgotPas
  * @body {forgot_password_token: string}
  */
 userRouter.post('/verify-forgot-password', verifyForgotPasswordValidator, warpAsync(verifyForgotPasswordController))
+
+/** 
+ * @description: reset password
+  * @path: '/reset-password'
+method: POST
+Header: không cần, vì  ngta quên mật khẩu rồi, thì sao mà đăng nhập để có authen đc
+body: {forgot_password_token: string, password: string, confirm_password: string}
+*/
+
+userRouter.post(
+  '/reset-password',
+  resetPasswordValidator,
+  verifyForgotPasswordValidator,
+  warpAsync(resetPasswordController)
+)
+
+/*
+des: get profile của user
+path: '/me'
+method: get
+Header: {Authorization: Bearer <access_token>}
+body: {}
+*/
+userRouter.get('/me', accessTokenValidator, warpAsync(getMeController))
 
 export default userRouter
