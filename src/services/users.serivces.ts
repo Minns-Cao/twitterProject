@@ -10,6 +10,8 @@ import { ObjectId } from 'mongodb'
 import { USERS_MESSAGES } from '~/constants/messages'
 import { ErrorWithStatus } from '~/models/Errors'
 import HTTP_STATUS from '~/constants/httpStatus'
+import { Follower } from '~/models/schemas/Followers.schema'
+import axios from 'axios'
 config()
 
 class UsersService {
@@ -259,6 +261,194 @@ class UsersService {
     }
 
     return user
+  }
+
+  async follow(user_id: string, followed_user_id: string) {
+    //kiểm tra xem đã follow hay chưa
+    const isFollowed = await databaseService.followers.findOne({
+      user_id: new ObjectId(user_id),
+      followed_user_id: new ObjectId(followed_user_id)
+    })
+    //nếu đã follow thì return message là đã follow
+    if (isFollowed != null) {
+      return {
+        message: USERS_MESSAGES.FOLLOWED
+      }
+    }
+    //chưa thì thêm 1 document vào collection followers
+    await databaseService.followers.insertOne(
+      new Follower({
+        user_id: new ObjectId(user_id),
+        followed_user_id: new ObjectId(followed_user_id)
+      })
+    )
+    return {
+      message: USERS_MESSAGES.FOLLOW_SUCCESS
+    }
+  }
+
+  async unfollow(user_id: string, followed_user_id: string) {
+    //kiểm tra xem đã follow hay chưa
+    const isFollowed = await databaseService.followers.findOne({
+      user_id: new ObjectId(user_id),
+      followed_user_id: new ObjectId(followed_user_id)
+    })
+
+    //nếu chưa follow thì return message là "đã unfollow trước đó" luôn
+    if (isFollowed == null) {
+      return {
+        message: USERS_MESSAGES.ALREADY_UNFOLLOWED
+      }
+    }
+
+    //nếu đang follow thì tìm và xóa document đó
+    const result = await databaseService.followers.deleteOne({
+      user_id: new ObjectId(user_id),
+      followed_user_id: new ObjectId(followed_user_id)
+    })
+
+    //nếu xóa thành công thì return message là unfollow success
+    return {
+      message: USERS_MESSAGES.UNFOLLOW_SUCCESS
+    }
+  }
+
+  async changePassword(user_id: string, password: string) {
+    //tìm user thông qua user_id
+    //cập nhật lại password và forgot_password_token
+    //tất nhiên là lưu password đã hash rồi
+    databaseService.users.updateOne({ _id: new ObjectId(user_id) }, [
+      {
+        $set: {
+          password: hashPassword(password),
+          forgot_password_token: '',
+          updated_at: '$$NOW'
+        }
+      }
+    ])
+    //nếu bạn muốn ngta đổi mk xong tự động đăng nhập luôn thì trả về access_token và refresh_token
+    //ở đây mình chỉ cho ngta đổi mk thôi, nên trả về message
+    return {
+      message: USERS_MESSAGES.CHANGE_PASSWORD_SUCCESS
+    }
+  }
+
+  async refreshToken(user_id: string, verify: UserVerifyStatus, refresh_token: string) {
+    //tạo mới
+    const [new_access_token, new_refresh_token] = await Promise.all([
+      this.signAccessToken({
+        user_id: user_id,
+        verify
+      }),
+      this.signRefreshToken({
+        user_id: user_id,
+        verify
+      })
+    ])
+    //vì một người đăng nhập ở nhiều nơi khác nhau, nên họ sẽ có rất nhiều document trong collection refreshTokens
+    //ta không thể dùng user_id để tìm document cần update, mà phải dùng token, đọc trong RefreshToken.schema.ts
+    await databaseService.refreshTokens.deleteOne({ token: refresh_token }) //xóa refresh
+    //insert lại document mới
+    await databaseService.refreshTokens.insertOne(
+      new RefreshToken({ user_id: new ObjectId(user_id), token: new_refresh_token })
+    )
+    return { access_token: new_access_token, refresh_token: new_refresh_token }
+  }
+
+  //getOAuthGoogleToken dùng code nhận đc để yêu cầu google tạo id_token
+  private async getOAuthGoogleToken(code: string) {
+    const body = {
+      code,
+      client_id: process.env.GOOGLE_CLIENT_ID,
+      client_secret: process.env.GOOGLE_CLIENT_SECRET,
+      redirect_uri: process.env.GOOGLE_REDIRECT_URI,
+      grant_type: 'authorization_code'
+    }
+
+    // giờ ta gọi API của google để lấy id_token (đây là đoạn mã hoá jwt chưa thông tin người dùng)
+    const { data } = await axios.post('https://oauth2.googleapis.com/token', body, {
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded' //kiểu truyền lên là form
+      }
+    })
+
+    return data as {
+      access_token: string
+    }
+  }
+
+  //getGoogleUserInfo dùng id_token để lấy thông tin của người dùng
+  private async getGoogleUserInfo(access_token: string) {
+    const { data } = await axios.get(`https://www.googleapis.com/oauth2/v3/tokeninfo`, {
+      headers: {
+        Authorization: `Bearer ${access_token}`
+      }
+    })
+
+    return data as {
+      id: string
+      email: string
+      email_verified: boolean
+      name: string
+      given_name: string
+      family_name: string
+      picture: string
+      locale: string
+    }
+  }
+
+  async oAuth(code: string) {
+    const { access_token } = await this.getOAuthGoogleToken(code)
+    const userInfo = await this.getGoogleUserInfo(access_token)
+    console.log(userInfo)
+
+    // nếu người dùng chưa xác thực email thì thông báo lỗi
+    if (!userInfo.email_verified) {
+      throw new ErrorWithStatus({
+        message: USERS_MESSAGES.GMAIL_NOT_VERIFIED,
+        status: HTTP_STATUS.BAD_REQUEST
+      })
+    }
+
+    // kiểm tra xem email đã tồn tại trong database chưa ?
+    const user = await databaseService.users.findOne({ email: userInfo.email })
+
+    if (user) {
+      // nếu đã tồn tại thì cho login, cấp cho access, refresh token
+      const [access_token, refresh_token] = await this.signAccessAndRefreshToken({
+        user_id: user._id.toString(),
+        verify: user.verify
+      })
+
+      // thêm rf token vào db
+      await databaseService.refreshTokens.insertOne(new RefreshToken({ user_id: user._id, token: refresh_token }))
+
+      // trả data cho FE
+      return {
+        access_token,
+        refresh_token,
+        new_user: 0,
+        verify: user.verify
+      }
+    } else {
+      // nếu chưa tồn tại thì đăng ký
+      //random string password
+      const password = Math.random().toString(36).substring(1, 15)
+      const { access_token, refresh_token } = await this.register({
+        email: userInfo.email,
+        name: userInfo.name,
+        password: password,
+        confirm_password: password,
+        date_of_birth: new Date().toISOString()
+      })
+
+      return {
+        access_token,
+        refresh_token,
+        new_user: 1, //đây là user mới
+        verify: UserVerifyStatus.Unverified
+      }
+    }
   }
 }
 

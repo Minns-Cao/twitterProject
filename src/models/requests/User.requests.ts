@@ -1,12 +1,13 @@
 import { verify } from 'crypto'
 import { JwtPayload } from 'jsonwebtoken'
 import { TokenType, UserVerifyStatus } from '~/constants/enums'
+import { ParamsDictionary } from 'express-serve-static-core'
 
 export interface RegisterReqBody {
   name: string
   email: string
   password: string
-  confirm_pasword: string
+  confirm_password: string
   date_of_birth: string
 }
 
@@ -43,4 +44,32 @@ export interface UpdateMeReqBody {
 
 export interface GetProfileReqParams {
   username: string
+}
+
+export interface FollowReqBody {
+  followed_user_id: string
+}
+
+export interface UnfollowReqParams {
+  user_id: string
+}
+
+//cho UnfollowReqParams kế thừa ParamsDictionary
+export interface UnfollowReqParams extends ParamsDictionary {
+  user_id: string
+}
+
+//ta làm luôn cho GetProfileReqParams
+export interface GetProfileReqParams extends ParamsDictionary {
+  username: string
+}
+
+export interface ChangePasswordReqBody {
+  old_password: string
+  password: string
+  confirm_password: string
+}
+
+export interface RefreshTokenReqBody {
+  refresh_token: string
 }
