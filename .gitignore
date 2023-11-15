@@ -1,6 +1,6 @@
 # Created by https://www.toptal.com/developers/gitignore/api/node
 # Edit at https://www.toptal.com/developers/gitignore?templates=node
-
+uploads
 ### Node ###
 # Logs
 logs
@@ -141,4 +141,6 @@ dist
 # SvelteKit build / generate output
 .svelte-kit
 
+
+client_secret_325528810340-9afm89ke6s8pqnj97k11clklgkcbsgdh.apps.googleusercontent.com.json
 # End of https://www.toptal.com/developers/gitignore/api/node
